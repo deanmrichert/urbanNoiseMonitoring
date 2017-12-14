@@ -1,0 +1,108 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{color,amsmath}
+
+\title{Microphone Calibration}
+\author{Dean Richert}
+
+\begin{document}
+
+\maketitle
+
+\section{Acoustic sensing basics}
+
+\subsection{Octave bands:} Let $n$ be the band number. Then the center of octave band $n$ (in Hz) is,
+\begin{align*}
+    f_c(N) = 2^{n-5} \times 10^3.
+\end{align*}
+The band limits, in Hz, are given by
+\begin{align*}
+    f_{\text{upper}}(n) &= \sqrt{2} f_c(n)
+    \\ 
+    f_{\text{lower}}(n) &= \frac{1}{\sqrt{2}} f_c(n)
+\end{align*}
+
+\subsection{Equivalent sound pressure level:} This is a measurement of average sound pressure. Let $p(t)$ be the instantaneous sound pressure at time $t$ and let $T$ be the time duration of a measurement. Then,
+\begin{align*}
+    L_{eq}(T) = 10 \log_{10}\bigg[\frac{1}{T} \int_0^T\bigg(\frac{p(t)}{p_0}\bigg)^2 dt\bigg]
+\end{align*}
+where $p_0$ is the reference sound pressure (usually $20\mu$Pa). For discrete time measurements, 
+\begin{align*}
+    L_{eq}(N) = 10 \log_{10}\bigg[\frac{1}{N} \sum_{k=0}^{N-1}\bigg(\frac{p(k)}{p_0}\bigg)^2 \bigg]
+\end{align*}
+where $N$ is the number of measurements. 
+\\
+We can also compute the equivalent sound pressure level in an octave band using a band pass filter, $H_n$, which pass frequencies in octave band $n$. Then the equivalent sound pressure level in octave band $n$ is
+\begin{align*}
+    L_{eq}^n(N) = 10 \log_{10}\bigg[\frac{1}{N} \sum_{t=0}^{N-1}\bigg(\frac{H_n[p(t)]}{p_0}\bigg)^2 \bigg]
+\end{align*}
+Here we assume that $H_n$ has unit gain ($0$dB) at $f_c(n)$. I use $6^{th}$ order Butterworth filters for $H_n$.
+
+To get the total sound pressure level across a set $\mathcal{N}$ of octave bands, the following calculation is performed:
+\begin{align*}
+    L_{eq}(N) = 10 \log_{10}\bigg( \sum_{n \in \mathcal{N}} 10^{\frac{L_{eq}^n(N)}{10}} \bigg)
+\end{align*}
+
+On the other hand, the average $L_{eq}$ of a set of sound pressure measurements taken over distinct time intervals, $\{L_{eq,i}\}_{i = 0}^{M-1}$, is given by
+\begin{align*}
+    L_{eq} = 10 \log_{10}\bigg( \frac{1}{M} \sum_{i = 0}^{M-1} 10^{\frac{L_{eq,i}}{10}} \bigg)
+\end{align*}
+
+\subsection{A-weighted $L_{eq}$:} The human ear is less sensitive to low frequencies; the perceived loudness of a low-frequency signal is less than the perceived loudness of a high-frequency signal of equal $L_{eq}$. The A-weighting of a sound pressure level accounts for this by weighting high-frequency components in a signal more than the low-frequency components. The A-weighted $L_{eq}$ in octave band $n$ is defined as
+\begin{align*}
+    LA_{eq}^n(N) = L_{eq}^n(N) + A(f_c(n))
+\end{align*}
+where
+\begin{align*}
+    A(f) &= 20 \log_{10} R_A(f) + 2 \\
+    R_A(f) &= \frac{12194^2 f^4}{(f^2 + 20.6^2)\sqrt{(f^2+107.7^2)(f^2+737.9^2)}(f^2+12194^2)}
+\end{align*}
+The units of $LA_{eq}$ are dBA. The total A-weighted sound pressure level for a signal can be computed as
+\begin{align*}
+    LA_{eq}(N) = 10 \log_{10}\bigg( \sum_{n \in \mathcal{N}} 10^{\frac{LA_{eq}^n(N)}{10}} \bigg)
+\end{align*}
+
+\section{Calibration}
+
+For a sound pressure signal $p(k)$ in octave band $n$, we assume that the microphone measurement is given by
+\begin{align*}
+    y(k) = K(n) p(k) + y_{DC}
+\end{align*}
+Note that there is a frequency dependence on the sensor gain $K(n)$ which is consistent with the data sheet.
+
+\subsection{DC bias:} To compute the DC bias we take advantage of the zero-mean property of $p(k)$. Taking the average over many measurements,
+\begin{align*}
+    \frac{1}{N} \sum_{k=0}^{N-1} y(k) &= \frac{K(n)}{N} \sum_{k=0}^{N-1} p(k) + y_{DC}
+    \\
+    y_{DC} &= \frac{1}{N} \sum_{k=0}^{N-1} y(k)
+\end{align*}
+
+\subsection{Sensor gain:} Suppose that $p(k)$ is a calibration tone at frequency $f_c(n)$ at $x$ dB. Then,
+\begin{align*}
+    x &= 10 \log_{10} \bigg[ \frac{1}{N} \sum_{k=0}^{N-1}\bigg(\frac{H_n(p(k))}{p_0} \bigg)^2 \bigg]
+    \\
+    x &= 10 \log_{10} \bigg[ \frac{1}{N} \sum_{k=0}^{N-1}\bigg(\frac{H_n((y(k)-y_{DC})/(K(n))}{p_0} \bigg)^2 \bigg]
+    \\
+    x &= 10 \log_{10} \bigg[ \frac{1}{(K(n)p_0)^2} \frac{1}{N} \sum_{k=0}^{N-1}\bigg(H_n(y(k)-y_{DC}) \bigg)^2 \bigg] 
+    \\
+    K_{cal}(n) :=  \frac{1}{(K(n)p_0)^2} &= \frac{10^{x/10}}{\frac{1}{N} \sum_{k=0}^{N-1}\big(H_n(y(k)-y_{DC})\big)^2} 
+\end{align*}
+The calibration routine is then given by:
+\begin{enumerate}
+    \item Generate a sound signal at $f_c(n)$ at known $x$ dB,
+    \item For each new measurement:
+        \begin{itemize}
+            \item Subtract the computed $y_{DC}$ from the raw measurement
+            \item Update the filter states with input $y(k) - y_{DC}$
+            \item Square the filter output and add it to the previous squared output
+        \end{itemize}
+    \item After taking sufficient measurements, compute $K_{cal}(n)$
+\end{enumerate}
+Note that we do not solve for $K(n)$ explicitly since $K_{cal}(n)$ is sufficient to compute the equivalent sound pressure level:
+\begin{align*}
+    L_{eq}^n(N) &= 10 \log_{10} \bigg[ \frac{K_{cal}(n)}{N} \sum_{k=0}^{N-1}\big(H_n(y(k) - y_{DC})\big)^2 \bigg]
+\end{align*}
+Note that if $H_n$ does not have unit gain at $f_c(n)$ this is absorbed into $K_{cal}(n)$. Thus, we do not actually design the band pass filters to have unit gain at the octave frequency and rather compensate for this through calibration.
+
+
+\end{document}
